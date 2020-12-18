@@ -1,44 +1,43 @@
 #include <iostream>
 #include <windows.h>
-#include <time.h>
+#include <chrono>
+#include <ctime>
+
+const int g_wakeUpTimeout = 5000;
 
 DWORD WINAPI MyThreadFunction(LPVOID lpParam) {
-	for (; ;) {
-		char str[26] = {};
-		time_t t = time(NULL);
-		time(&t);
-		ctime_s(str, sizeof(str), &t);
-		std::cout << "Date and Time: " << str << std::endl;
-		Sleep(5000);
+	int timeout = *static_cast<int*>(lpParam);
+	while (timeout > 0) {
+		time_t time = std::time(nullptr);
+		char timeStr[26] = {};		
+		ctime_s(timeStr, sizeof(timeStr), &time);
+		std::cout << "Date and Time: " << timeStr << std::endl;
+		timeout -= g_wakeUpTimeout;
+		Sleep(g_wakeUpTimeout);
 	}
 	return 0;
 }
 
 int main()
 {
-	time_t threadLifetimeBegin = time(NULL);
-	
-	DWORD threadId = 0;
-	HANDLE h = CreateThread(
-		NULL,
-		0,
-		MyThreadFunction,
-		0,
-		0,
-		&threadId);
-
-	Sleep(25000);
-
-	time_t threadLifetimeEnd = time(NULL);
-
-	char* pValue;
-	size_t len;
-	errno_t err = _dupenv_s(&pValue, &len, "MY_VAR");
+	char* pValue = {};
+	size_t len = {};
+	errno_t err = _dupenv_s(&pValue, &len, "My_Time");
+	int timeout = atoi(pValue);
 	if (!err) {
-		time_t threadLifetime = threadLifetimeEnd - threadLifetimeBegin;
-		std::cout << "Thread lifetime in seconds: " << threadLifetime << std::endl;
-	}
-	free(pValue);
+		DWORD threadId = 0;
+		HANDLE h = CreateThread(
+			NULL,
+			0,
+			MyThreadFunction,
+			&timeout,
+			0,
+			&threadId);
+		Sleep(timeout + g_wakeUpTimeout);
 
+		time_t threadLifetimeEnd = time(NULL);
+		CloseHandle(h);
+		free(pValue);
+	}
 	return 0;
 }
